@@ -1,6 +1,12 @@
 // This file implements methods from the QPDF class that involve
 // encryption.
-//由于不会c++,直接修改了解密位置处,使用rc4 40bit解密pdf文档
+//Because I do n’t know anything about C ++, I partially modified the code to achieve the effect of using RC4 40bit key to decrypt the pdf.
+//Examples of use:
+//qpdf --password = 87bc5fef40_bugscaner_ --decrypt input.pdf output.pdf
+
+//As shown above, you only need to add _bugscaner_ after 40bit and the program will be recognized as 40bit key decryption
+//This modification is just for backup, to prevent forgetting for a long time without use, and has no other effect
+
 
 #include <qpdf/QPDF.hh>
 
@@ -18,7 +24,6 @@
 #include <algorithm>
 #include <assert.h>
 #include <string.h>
-#include <iostream>
 
 static unsigned char const padding_string[] = {
     0x28, 0xbf, 0x4e, 0x5e, 0x4e, 0x75, 0x8a, 0x41,
@@ -35,10 +40,6 @@ static unsigned int const OU_key_bytes_V4 = sizeof(MD5::Digest);
 static unsigned int const OU_key_bytes_V5 = 48;
 static unsigned int const OUE_key_bytes_V5 = 32;
 static unsigned int const Perms_key_bytes_V5 = 16;
-
-//定义一个R此 FLAG
-bool rc4hex;
-
 
 int
 QPDF::EncryptionData::getV() const
@@ -149,7 +150,6 @@ QPDF::trim_user_password(std::string& user_password)
     // Although unnecessary, this routine trims the padding string
     // from the end of a user password.  Its only purpose is for
     // recovery of user passwords which is done in the test suite.
-	QTC::TC("qpdf", "wozaizhelia bugscaner");
     char const* cstr = user_password.c_str();
     size_t len = user_password.length();
     if (len < key_bytes)
@@ -211,7 +211,6 @@ iterate_rc4(unsigned char* data, size_t data_len,
 	    unsigned char* okey, int key_len,
 	    int iterations, bool reverse)
 {
-	QTC::TC("qpdf", "iterate_rc4(unsigned char* data, size_t data_len");
     PointerHolder<unsigned char> key_ph = PointerHolder<unsigned char>(
         true, new unsigned char[QIntC::to_size(key_len)]);
     unsigned char* key = key_ph.getPointer();
@@ -415,7 +414,6 @@ QPDF::compute_encryption_key(
     }
 }
 
-
 void fromHex(
     const std::string& in,     //!< Input hex string
     unsigned char *data           //!< Data store
@@ -441,19 +439,15 @@ void fromHex(
     }
 }
 
+
+
+
 std::string
 QPDF::compute_encryption_key_from_password(
     std::string const& password, EncryptionData const& data)
 {
     // Algorithm 3.2 from the PDF 1.7 Reference Manual
-
-    // This code does not properly handle Unicode passwords.
-    // Passwords are supposed to be converted from OS codepage
-    // characters to PDFDocEncoding.  Unicode passwords are supposed
-    // to be converted to OS codepage before converting to
-    // PDFDocEncoding.  We instead require the password to be
-    // presented in its final form.
-	//他妈的就是这里劫持40bitkey值即可,究竟该怎么传递呢？
+	//这里实现40bitkey值即可,究竟该怎么传递呢？
 	if(password.find("_bugscaner_") != std::string::npos){
 		//std::cout << "rc4 hex decrypt" << std::endl;
 		//开始截取40bit密匙
@@ -464,6 +458,13 @@ QPDF::compute_encryption_key_from_password(
 		//std::cout << passwordbyte << std::endl;
 		return std::string(reinterpret_cast<char*>(passwordbyte), 5);
 	}
+    // This code does not properly handle Unicode passwords.
+    // Passwords are supposed to be converted from OS codepage
+    // characters to PDFDocEncoding.  Unicode passwords are supposed
+    // to be converted to OS codepage before converting to
+    // PDFDocEncoding.  We instead require the password to be
+    // presented in its final form.
+
     MD5 md5;
     md5.encodeDataIncrementally(
 	pad_or_truncate_password_V4(password).c_str(), key_bytes);
@@ -497,7 +498,6 @@ compute_O_rc4_key(std::string const& user_password,
 		  QPDF::EncryptionData const& data,
 		  unsigned char key[OU_key_bytes_V4])
 {
-	QTC::TC("qpdf", "compute_O_rc4_key(std::string const& user_password,");
     if (data.getV() >= 5)
     {
 	throw std::logic_error(
@@ -524,7 +524,7 @@ compute_O_value(std::string const& user_password,
 		QPDF::EncryptionData const& data)
 {
     // Algorithm 3.3 from the PDF 1.7 Reference Manual
-	QTC::TC("qpdf", "compute_O_value(std::string const& user_password,");
+
     unsigned char O_key[OU_key_bytes_V4];
     compute_O_rc4_key(user_password, owner_password, data, O_key);
 
@@ -544,7 +544,7 @@ compute_U_value_R2(std::string const& user_password,
 		   QPDF::EncryptionData const& data)
 {
     // Algorithm 3.4 from the PDF 1.7 Reference Manual
-	QTC::TC("qpdf", "compute_U_value_R2(std::string const& user_password,");
+
     std::string k1 = QPDF::compute_encryption_key(user_password, data);
     char udata[key_bytes];
     pad_or_truncate_password_V4("", udata);
@@ -561,7 +561,7 @@ compute_U_value_R3(std::string const& user_password,
 		   QPDF::EncryptionData const& data)
 {
     // Algorithm 3.5 from the PDF 1.7 Reference Manual
-	QTC::TC("qpdf", "compute_U_value_R3(std::string const& user_password,");
+
     std::string k1 = QPDF::compute_encryption_key(user_password, data);
     MD5 md5;
     md5.encodeDataIncrementally(
@@ -641,7 +641,7 @@ check_owner_password_V4(std::string& user_password,
                         QPDF::EncryptionData const& data)
 {
     // Algorithm 3.7 from the PDF 1.7 Reference Manual
-	QTC::TC("qpdf", "check_owner_password_V4(std::string& user_password,");
+
     unsigned char key[OU_key_bytes_V4];
     compute_O_rc4_key(user_password, owner_password, data, key);
     unsigned char O_data[key_bytes];
@@ -1276,8 +1276,6 @@ QPDF::decryptStream(PointerHolder<EncryptionParameters> encp,
                     bool is_attachment_stream,
 		    std::vector<PointerHolder<Pipeline> >& heap)
 {
-	std::cout<<"jinrule jiemi wenjianliu"<<std::endl;
-	QTC::TC("qpdf", "QPDF::decryptStream(PointerHolder<EncryptionParameters> encp,");
     std::string type;
     if (stream_dict.getKey("/Type").isName())
     {
@@ -1291,7 +1289,6 @@ QPDF::decryptStream(PointerHolder<EncryptionParameters> encp,
     bool use_aes = false;
     if (encp->encryption_V >= 4)
     {
-	std::cout<<"encp->encryption_V >= 4"<<std::endl;
 	encryption_method_e method = e_unknown;
 	std::string method_source = "/StmF from /Encrypt dictionary";
 
@@ -1393,8 +1390,6 @@ QPDF::decryptStream(PointerHolder<EncryptionParameters> encp,
 	}
     }
     std::string key = getKeyForObject(encp, objid, generation, use_aes);
-	//打一下一下key
-	std::cout<<key<<std::endl;
     if (use_aes)
     {
 	QTC::TC("qpdf", "QPDF_encryption aes decode stream");
